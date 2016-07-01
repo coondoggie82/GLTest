@@ -1,21 +1,21 @@
-#ifndef PCLVIEWER_H
-#define PCLVIEWER_H
+#ifndef GLVIEWER_H
+#define GLVIEWER_H
 
-#include <QVTKWidget.h>
+#include <QOpenGLWidget>
 #include <pcl/point_cloud.h>
 #include <pcl/visualization/pcl_visualizer.h>
 
 
-class PCLViewer : public QVTKWidget
+class GLViewer : public QOpenGLWidget
 {
     Q_OBJECT
+
 public:
-    explicit PCLViewer(QWidget *parent = 0);
+    explicit GLViewer(QWidget *parent = 0);
     void showPolygonMesh(pcl::PolygonMesh, QString meshName);
     QSize sizeHint() const;
 
 private:
-    pcl::visualization::PCLVisualizer::Ptr viewer;
 
 };
 

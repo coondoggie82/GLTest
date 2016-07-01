@@ -13,10 +13,10 @@ TEMPLATE = app
 
 
 SOURCES += main.cpp\
-        mainwindow.cpp\
-        pclviewer.cpp
+        mainwindow.cpp \
+    glviewer.cpp
 
-HEADERS  += mainwindow.h\
-            pclviewer.h
+HEADERS  += mainwindow.h \
+    glviewer.h
 
 FORMS    += mainwindow.ui

@@ -1,6 +1,5 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "pclviewer.h"
 #include <pcl/io/ply_io.h>
 
 MainWindow::MainWindow(QWidget *parent) :
@@ -9,7 +8,7 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
     this->setWindowTitle("GLTest");
-    pclViewer = new PCLViewer(ui->pclWidget);
+    glViewer = new GLViewer(ui->glWidget);
     openMeshFile();
 }
 
@@ -21,5 +20,5 @@ MainWindow::~MainWindow()
 void MainWindow::openMeshFile(){
     pcl::PolygonMesh mesh = pcl::PolygonMesh();
     pcl::io::loadPLYFile("./scans/testScan.ply", mesh);
-    pclViewer->showPolygonMesh(mesh, "mesh1");
+    glViewer->showPolygonMesh(mesh, "mesh1");
 }

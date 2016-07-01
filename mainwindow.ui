@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1060</width>
-    <height>693</height>
+    <width>486</width>
+    <height>538</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,7 +19,7 @@
      <rect>
       <x>40</x>
       <y>40</y>
-      <width>151</width>
+      <width>251</width>
       <height>31</height>
      </rect>
     </property>
@@ -31,10 +31,10 @@
      </font>
     </property>
     <property name="text">
-     <string>PCL Viewer</string>
+     <string>OpenGL Viewer</string>
     </property>
    </widget>
-   <widget class="QWidget" name="pclWidget" native="true">
+   <widget class="QWidget" name="glWidget" native="true">
     <property name="geometry">
      <rect>
       <x>40</x>
@@ -50,7 +50,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1060</width>
+     <width>486</width>
      <height>25</height>
     </rect>
    </property>

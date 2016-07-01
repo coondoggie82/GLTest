@@ -2,7 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
-#include "pclviewer.h"
+#include "glviewer.h"
 
 namespace Ui {
 class MainWindow;
@@ -18,7 +18,7 @@ public:
 
 private:
     Ui::MainWindow *ui;
-    PCLViewer *pclViewer;
+    GLViewer *glViewer;
 
     void openMeshFile();
 };
