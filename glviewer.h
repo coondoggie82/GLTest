@@ -37,8 +37,6 @@ private:
     double m_lfzTrans;
     int m_nshift;
     QPoint m_QPlastPos;
-    QColor m_qtGreen;
-    QColor m_qtPurple;
     pcl::PolygonMesh m_PMmesh;
 
 public slots:
