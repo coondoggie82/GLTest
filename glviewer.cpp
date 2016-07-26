@@ -599,7 +599,7 @@ void GLViewer::pinchTriggered(QPinchGesture *gesture)
     if (changeFlags & QPinchGesture::ScaleFactorChanged) {
         // Determine how the scale has changed due to pinching
         qreal value = gesture->property("scaleFactor").toReal();
-        cout << fabs(value - 1.0) << endl;
+        // cout << fabs(value - 1.0) << endl;
         // Zoom out && make sure panning does not affect zoom as easily
         if(value < 1.0 && fabs(value - 1.0) > 0.025)
         {
