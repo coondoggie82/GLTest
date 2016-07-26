@@ -114,7 +114,7 @@ void GLViewer::hidePolygonMesh(QString meshName){
     paintGL();          // Draws the meshes and clouds in the glviewer
 }
 
-void GLViewer::showCloud(pcl::PointCloud<pcl::PointXYZRGBA> cloud, 
+void GLViewer::showCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
                          QString cloudName)
 {
     try
@@ -337,11 +337,11 @@ void GLViewer::getDiffs(pcl::PolygonMesh mesh)
 }
 
 // Determine the best translation changes based on the object size
-void GLViewer::getDiffs(pcl::PointCloud<pcl::PointXYZRGBA> cloud)
+void GLViewer::getDiffs(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud)
 {
-    for(size_t i=0; i<cloud.points.size(); ++i)
+    for(size_t i=0; i<cloud->points.size(); ++i)
     {        
-        PointT p1 = cloud.points[i];
+        PointT p1 = cloud->points[i];
         if(p1.x < m_lfXMin)
         {
             m_lfXMin = p1.x;
@@ -375,7 +375,7 @@ void GLViewer::getDiffs(pcl::PointCloud<pcl::PointXYZRGBA> cloud)
     m_lfDy = (m_lfYMax-m_lfYMin)/250.0;
     m_lfDz = (m_lfZMax-m_lfZMin)/20.0;
 
-    m_nPTot += int(cloud.points.size());
+    m_nPTot += int(cloud->points.size());
     m_lfXAvg = m_lfXTot/double(m_nPTot);
     m_lfYAvg = m_lfYTot/double(m_nPTot);
     m_lfZAvg = m_lfZTot/double(m_nPTot);
@@ -398,23 +398,24 @@ void GLViewer::getDiffs(pcl::PointCloud<pcl::PointXYZRGBA> cloud)
 }
 
 // Adds a cloud to m_vClouds
-void GLViewer::addCloud(pcl::PointCloud<pcl::PointXYZRGBA> cloud)
+void GLViewer::addCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud)
 {
-    m_vClouds.push_back(cloud);
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr sourceCloud(cloud);
+    m_vClouds.push_back(sourceCloud);
 } 
 
 // Adds a mesh to m_vMeshes
 void GLViewer::addMesh(pcl::PolygonMesh mesh)
 {
     // Create normal point cloud
-    PointCloudT* meshCloud = new PointCloudT;
+    PointCloudT::Ptr meshCloud(new PointCloudT);
 
     // Transfer pointcloud2 data to point cloud data
     pcl::fromPCLPointCloud2(mesh.cloud, *meshCloud);
 
     m_vMeshes.push_back(mesh);
     m_vbShowClouds.push_back(false); // Already showing mesh. Do not show cloud
-    showCloud(*meshCloud, "meshCloud1"); // Add cloud for future use
+    showCloud(meshCloud, "meshCloud1"); // Add cloud for future use
 }
 
 // GL window size
@@ -510,7 +511,7 @@ void GLViewer::initializeGL()
     glDisable(GL_LIGHTING);
     glDisable(GL_TEXTURE_1D);
     glDisable(GL_TEXTURE_2D);
-    glDisable(GL_TEXTURE_3D);
+//     glDisable(GL_TEXTURE_3D);
     glShadeModel(GL_FLAT);
     
     // glCullFace(GL_FRONT);
@@ -519,7 +520,7 @@ void GLViewer::initializeGL()
 
     // Sets camera fov, aspect ratio, and near/far values
     gluPerspective(45.0, 1.0, 0.01f, 350.0f); 
-    glEnable(GL_MULTISAMPLE);    // Antialiasing
+//     glEnable(GL_MULTISAMPLE);    // Antialiasing
 
     // These may be helpful later? MIP
     // glShadeModel(GL_SMOOTH);
@@ -933,14 +934,14 @@ void GLViewer::paintGL()
         {
             // Set a large distance between points to shrink
             oneRad.push_back(1e12);     
-            for(int j=1; j < m_vClouds[i].points.size(); ++j)
+            for(int j=1; j < m_vClouds[i]->points.size(); ++j)
             {
                 // Defines the current cloud point
                 PointT p1;
-                p1 = m_vClouds[i].points[j];
+                p1 = m_vClouds[i]->points[j];
                 // Defines the first cloud point
                 PointT p2;
-                p2 = m_vClouds[i].points[0];
+                p2 = m_vClouds[i]->points[0];
                 // The radius between the first cloud point and current point
                 double thisRad = sqrt((p2.x - p1.x) * (p2.x - p1.x) + 
                                       (p2.y - p1.y) * (p2.y - p1.y) +
@@ -973,10 +974,10 @@ void GLViewer::paintGL()
         if(bShow)
         {            
             glBegin(GL_LINES);
-            for(int j=0; j < m_vClouds[i].points.size(); ++j)
+            for(int j=0; j < m_vClouds[i]->points.size(); ++j)
             {
                 PointT p1;
-                p1 = m_vClouds[i].points[j];
+                p1 = m_vClouds[i]->points[j];
                 // Sets point color
                 glColor4ub(p1.r, p1.g, p1.b, p1.a);
                 // Draws the point
@@ -1365,12 +1366,12 @@ void GLViewer::getPointIndex()
         {
             vector<double> oneRad;  // Find a good representation of the 
             oneRad.push_back(1e12); //   spacing between cloud points
-            for(int j=1; j < m_vClouds[i].points.size(); ++j)
+			for(int j=1; j < m_vClouds[i]->points.size(); ++j)
             {
                 PointT p1;
-                p1 = m_vClouds[i].points[j];
+                p1 = m_vClouds[i]->points[j];
                 PointT p2;
-                p2 = m_vClouds[i].points[0];
+                p2 = m_vClouds[i]->points[0];
 
                 // The distance between current points
                 double thisRad = sqrt((p2.x - p1.x) * (p2.x - p1.x) + 
@@ -1385,10 +1386,10 @@ void GLViewer::getPointIndex()
             oneRad[i] = oneRad[i] * 10.0; // Need cloud data to be visible
                                           //   so add scaling factor
             double dDist = 1e12;
-            for(int j=1; j < m_vClouds[i].points.size(); ++j)
+            for(int j=1; j < m_vClouds[i]->points.size(); ++j)
             {
                 PointT p1;
-                p1 = m_vClouds[i].points[j];
+                p1 = m_vClouds[i]->points[j];
                 PointT p2;
                 p2.x = p1.x + oneRad[i];
                 p2.y = p1.y + oneRad[i];

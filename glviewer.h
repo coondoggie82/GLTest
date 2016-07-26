@@ -21,7 +21,8 @@ public:
     void showPolygonMesh(pcl::PolygonMesh mesh, QString meshName);
     void showPolygonMesh(QString meshName);
     void hidePolygonMesh(QString meshName);
-    void showCloud(pcl::PointCloud<pcl::PointXYZRGBA> cloud, QString cloudName);
+    void showCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
+		           QString cloudName);
     void showCloud(QString cloudName);
     void hideCloud(QString cloudName);
     QSize sizeHint() const;
@@ -54,9 +55,9 @@ protected:
     void keyPressEvent(QKeyEvent *event);
     void keyReleaseEvent(QKeyEvent *event);
     void getDiffs(pcl::PolygonMesh mesh);
-    void getDiffs(pcl::PointCloud<pcl::PointXYZRGBA> cloud);
+    void getDiffs(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud);
     void addMesh(pcl::PolygonMesh mesh);
-    void addCloud(pcl::PointCloud<pcl::PointXYZRGBA> cloud);
+    void addCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud);
     std::vector<double> normalizeUP();
     std::vector<double> normalizeLOS();
     std::vector<double> normalizeCross(std::vector<double> fVec, 
@@ -113,7 +114,8 @@ private:
     std::vector<QString> m_vQSMeshNames;
     std::vector<bool> m_vbShowMeshes;
     std::vector<pcl::PolygonMesh> m_vMeshes;
-    std::vector< pcl::PointCloud< pcl::PointXYZRGBA > > m_vClouds;
+    std::vector< PointCloudT::Ptr, 
+		         Eigen::aligned_allocator <PointCloudT::Ptr > > m_vClouds;
 
     // MIP These are for testing purposes
     bool m_bCKey;
