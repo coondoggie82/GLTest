@@ -115,7 +115,7 @@ private:
     std::vector<bool> m_vbShowMeshes;
     std::vector<pcl::PolygonMesh> m_vMeshes;
     std::vector< PointCloudT::Ptr, 
-		         Eigen::aligned_allocator <PointCloudT::Ptr > > m_vClouds;
+		 Eigen::aligned_allocator <PointCloudT::Ptr > > m_vClouds;
 
     // MIP These are for testing purposes
     bool m_bCKey;
