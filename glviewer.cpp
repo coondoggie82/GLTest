@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QGLShaderProgram>
 #include <QMessageBox>
+#include <QScrollBar>
+#include <QtGui>
 #include <iostream>
 #include <fstream>
 #include "glut.h"
@@ -14,7 +16,7 @@ using  std::allocator;
 using  pcl::Vertices;
 
 GLViewer::GLViewer(QWidget *parent) :
-    QGLWidget(parent)
+QGLWidget(parent)
 {
     //Setup OpenGL Widget
     m_nxRot = 0;      // Total rotation of camera about the x-axis
@@ -34,7 +36,9 @@ GLViewer::GLViewer(QWidget *parent) :
     m_lfzTrans = 0;   // Total camera translation change in the z-direction
     m_bshift = false; // Whether the Shift key is held down
     m_bPoint = false; // Whether to grab point info or not
-
+    m_bMouse = true;  // Whether to do zooming and panning with mouse
+    m_bRotate = true; // Whether to rotate around object (turn off @ zoom)
+    
     m_lfXMin = 1e12;  // Minimum x-value of objects;
     m_lfYMin = 1e12;  // Minimum y-value of objects;
     m_lfZMin = 1e12;  // Minimum z-value of objects;
@@ -49,7 +53,8 @@ GLViewer::GLViewer(QWidget *parent) :
     m_lfZTot = 0.0;   // Total z-value of object points;
     m_nPTot = 0;      // Total number of object points;
 
-    m_bDrawAxis = true; // Whether to draw the x, y, z axis
+    m_bDrawAxis = true;          // Whether to draw the x, y, z axis
+    m_qrTotalScaleFactor = 1.0;  // Scale factor for pinch zoom
 
     // MIP testing only
     m_bCKey = false;
@@ -60,6 +65,14 @@ GLViewer::GLViewer(QWidget *parent) :
 
     // Makes sure glviewer is in focus for keypress events
     setFocusPolicy(Qt::StrongFocus);
+    // Sets up touch events
+    setAttribute(Qt::WA_AcceptTouchEvents);
+    this->setAttribute(Qt::WA_AcceptTouchEvents);
+
+    grabGesture(Qt::PanGesture);
+    grabGesture(Qt::PinchGesture);
+    grabGesture(Qt::SwipeGesture);
+
 }
 
 // The main function to pass in point cloud polygon mesh data for the viewer
@@ -115,7 +128,7 @@ void GLViewer::hidePolygonMesh(QString meshName){
 }
 
 void GLViewer::showCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
-                         QString cloudName)
+    QString cloudName)
 {
     try
     {
@@ -198,7 +211,7 @@ void GLViewer::checkMeshNameMissing(QString meshName, bool bShow)
             catch(GLViewer::SmallDimension)
             {
                 cout << "\033[1;31mException: Mesh[" << i << "] does not exist" 
-                 << "\033[0m" << endl;
+                     << "\033[0m" << endl;
                 bCheck = false;
             }
             if(bCheck)
@@ -246,7 +259,7 @@ void GLViewer::checkCloudNameMissing(QString cloudName, bool bShow)
             catch(GLViewer::SmallDimension)
             {
                 cout << "\033[1;31mException: Cloud[" << i << "] does not exist"
-                 << "\033[0m" << endl;
+                     << "\033[0m" << endl;
                 bCheck = false;
             }
             if(bCheck)
@@ -427,16 +440,21 @@ QSize GLViewer::sizeHint() const{
 static void qNormalizeAngle(int &angle)
 {
     while (angle < 0)
+    {
         angle += 360 * 16;
+    }
     while (angle > 360 * 16)
+    {
         angle -= 360 * 16;
+    }
 }
 
 // Update the x-rotation based on mouse/touch events
 void GLViewer::setXRotation(int angle)
 {
     qNormalizeAngle(angle);
-    if (angle != m_nxRot) {
+    if (angle != m_nxRot) 
+    {
         m_nxRot = angle;
         emit xRotationChanged(angle);
         updateGL();
@@ -447,7 +465,8 @@ void GLViewer::setXRotation(int angle)
 void GLViewer::setYRotation(int angle)
 {
     qNormalizeAngle(angle);
-    if (angle != m_nyRot) {
+    if (angle != m_nyRot) 
+    {
         m_nyRot = angle;
         emit yRotationChanged(angle);
         update();
@@ -458,7 +477,8 @@ void GLViewer::setYRotation(int angle)
 void GLViewer::setZRotation(int angle)
 {
     qNormalizeAngle(angle);
-    if (angle != m_nzRot) {
+    if (angle != m_nzRot) 
+    {
         m_nzRot = angle;
         emit zRotationChanged(angle);
         update();
@@ -468,7 +488,8 @@ void GLViewer::setZRotation(int angle)
 // Update the x-translation based on mouse/touch events
 void GLViewer::setXTranslation(double dist)
 {
-    if (dist != m_lfxTrans) {
+    if (dist != m_lfxTrans) 
+    {
         m_lfxTrans = dist;
         emit xTranslationChanged(dist);
         update();
@@ -478,7 +499,8 @@ void GLViewer::setXTranslation(double dist)
 // Update the y-translation based on mouse/touch events
 void GLViewer::setYTranslation(double dist)
 {
-    if (dist != m_lfyTrans) {
+    if (dist != m_lfyTrans) 
+    {
         m_lfyTrans = dist;
         emit yTranslationChanged(dist);
         update();
@@ -488,7 +510,8 @@ void GLViewer::setYTranslation(double dist)
 // Update the z-translation based on mouse/touch events
 void GLViewer::setZTranslation(double dist)
 {
-    if (dist != m_lfzTrans) {
+    if (dist != m_lfzTrans) 
+    {
         m_lfzTrans = dist;
         emit zTranslationChanged(dist);
         update();
@@ -498,7 +521,7 @@ void GLViewer::setZTranslation(double dist)
 // Initialize GL environment settings for lighting, rendering, and depth testing
 void GLViewer::initializeGL()
 {
-    
+
     // glClearColor(0.0, 0.0, 0.0, 0.0);    // black background
 
     glEnable(GL_DEPTH_TEST);     // Occludes objects behind closer objects
@@ -511,16 +534,16 @@ void GLViewer::initializeGL()
     glDisable(GL_LIGHTING);
     glDisable(GL_TEXTURE_1D);
     glDisable(GL_TEXTURE_2D);
-//     glDisable(GL_TEXTURE_3D);
+    //     glDisable(GL_TEXTURE_3D);
     glShadeModel(GL_FLAT);
-    
+
     // glCullFace(GL_FRONT);
     glMatrixMode(GL_PROJECTION); // Matrix mode for camera coordinates
     glLoadIdentity();            // Resets camera transformation matrix
 
     // Sets camera fov, aspect ratio, and near/far values
     gluPerspective(45.0, 1.0, 0.01f, 350.0f); 
-//     glEnable(GL_MULTISAMPLE);    // Antialiasing
+    //     glEnable(GL_MULTISAMPLE);    // Antialiasing
 
     // These may be helpful later? MIP
     // glShadeModel(GL_SMOOTH);
@@ -535,6 +558,94 @@ void GLViewer::resizeGL(int w, int h)
 {
     glLoadIdentity();                                     // Reset camera xform
     gluPerspective(45.0f, GLfloat(w) / h, 0.01f, 100.0f); // Set camera values
+} 
+
+// Checks if current event is a gesture event
+bool GLViewer::event(QEvent *event)
+{
+    // Gesture events override mouse events
+    if (event->type() == QEvent::Gesture)
+    {
+        m_bMouse = false;
+        return gestureEvent(static_cast<QGestureEvent*>(event));
+    }
+    return QGLWidget::event(event);
+}
+
+// Swipe event is not needed at this time
+void GLViewer::swipeTriggered(QSwipeGesture *gesture)
+{
+}
+
+// Pan with 2-3 fingers
+void GLViewer::panTriggered(QPanGesture *gesture)
+{
+    // Do not rotate around object while panning
+    m_bRotate = false;
+    int dx = gesture->delta().x(); // Touch change in x-direction
+    int dy = gesture->delta().y(); // Touch change in y-direction
+    setXTranslation(m_lfxTrans + m_lfDx * dx);
+    setYTranslation(m_lfyTrans - m_lfDy * dy);
+}
+
+// Pinch with two fingers - moving together zooms out & moving apart zooms in
+void GLViewer::pinchTriggered(QPinchGesture *gesture)
+{
+    // Do not rotate around object while zooming
+    m_bRotate = false;
+    // Track the pinch change
+    QPinchGesture::ChangeFlags changeFlags = gesture->changeFlags();
+    double dz;
+    if (changeFlags & QPinchGesture::ScaleFactorChanged) {
+        // Determine how the scale has changed due to pinching
+        qreal value = gesture->property("scaleFactor").toReal();
+        cout << fabs(value - 1.0) << endl;
+        // Zoom out && make sure panning does not affect zoom as easily
+        if(value < 1.0 && fabs(value - 1.0) > 0.025)
+        {
+            dz = m_lfzTrans - (2.0 - value) * 5.0 * m_lfDz;
+            setZTranslation(dz);
+        }
+        // Zoom in && make sure panning does not affect zoom as easily
+        if(value > 1.0 && fabs(value - 1.0) > 0.025)
+        {
+            dz = m_lfzTrans + value * 5.0 * m_lfDz;
+            setZTranslation(dz);
+        }
+    }
+}
+
+// Checks for gesture events
+bool GLViewer::gestureEvent(QGestureEvent *event)
+{
+    if (QGesture *swipe = event->gesture(Qt::SwipeGesture))
+    {
+        swipeTriggered(static_cast<QSwipeGesture *>(swipe));
+    }
+    else if (QGesture *pan = event->gesture(Qt::PanGesture))
+    {
+        panTriggered(static_cast<QPanGesture *>(pan));
+    }
+    if (QGesture *pinch = event->gesture(Qt::PinchGesture))
+    {
+        pinchTriggered(static_cast<QPinchGesture *>(pinch));
+    }
+    return true;
+}
+
+// Captures when a mouse key is double clicked
+void GLViewer::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    m_bshift = true;
+    // cout << "Panning enabled." << endl;
+}
+
+// Captures when a mouse key is released
+void GLViewer::mouseReleaseEvent(QMouseEvent *event)
+{
+    m_bshift = false;
+    m_bRotate = true;
+    // cout << "Panning disabled." << endl;
 }
 
 // Captures when a mouse key is pressed
@@ -567,11 +678,11 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
 
     // Left mouse button held down (without Shift key) rotates camera 
     //     around object
-    if(!m_bshift && !m_bPoint && event->buttons() & Qt::LeftButton) 
+    if(!m_bshift && !m_bPoint && m_bRotate && event->buttons() & Qt::LeftButton) 
     {
         // rotate about x-axis only when mouse is fairly close to object center
         if(event->x() < int(2.0f/3.0f * float(windowSize.width())) && 
-           event->x() > int(1.0f/3.0f * float(windowSize.width())))
+            event->x() > int(1.0f/3.0f * float(windowSize.width())))
         {
             setXRotation(m_nxRot + 8 * dy);
         }
@@ -580,11 +691,11 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         {
             if(m_nyRot <= 90*16 && m_nyRot >= -90*16)
             {
-            	setZRotation(m_nzRot - 8 * dy);
+                setZRotation(m_nzRot - 8 * dy);
             }
             else if(m_nyRot >= 270*16 && m_nyRot <= 360*16)
             {
-            	setZRotation(m_nzRot - 8 * dy);
+                setZRotation(m_nzRot - 8 * dy);
             }
             else if(m_nyRot > 90*16 && m_nyRot < 270*16)
             {
@@ -596,11 +707,11 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         {
             if(m_nyRot <= 90*16 && m_nyRot >= -90*16)
             {
-            	setZRotation(m_nzRot + 8 * dy);
+                setZRotation(m_nzRot + 8 * dy);
             }
             else if(m_nyRot >= 270*16 && m_nyRot <= 360*16)
             {
-            	setZRotation(m_nzRot + 8 * dy);
+                setZRotation(m_nzRot + 8 * dy);
             }
             else if(m_nyRot > 90*16 && m_nyRot < 270*16)
             {
@@ -609,7 +720,7 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         }
         // rotate about y-axis only when mouse is fairly close to object center
         if(event->y() < int(2.0f/3.0f * float(windowSize.height())) && 
-           event->y() > int(1.0f/3.0f * float(windowSize.height())))
+            event->y() > int(1.0f/3.0f * float(windowSize.height())))
         {
             setYRotation(m_nyRot + 8 * dx);
         }
@@ -618,11 +729,11 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         {
             if(m_nyRot <= 90*16 && m_nyRot >= -90*16)
             {
-            	setZRotation(m_nzRot + 8 * dx);
+                setZRotation(m_nzRot + 8 * dx);
             }
             else if(m_nyRot >= 270*16 && m_nyRot <= 360*16)
             {
-            	setZRotation(m_nzRot + 8 * dx);
+                setZRotation(m_nzRot + 8 * dx);
             }
             else if(m_nyRot > 90*16 && m_nyRot < 270*16)
             {
@@ -634,11 +745,11 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         {
             if(m_nyRot <= 90*16 && m_nyRot >= -90*16)
             {
-            	setZRotation(m_nzRot - 8 * dx);
+                setZRotation(m_nzRot - 8 * dx);
             }
             else if(m_nyRot >= 270*16 && m_nyRot <= 360*16)
             {
-            	setZRotation(m_nzRot - 8 * dx);
+                setZRotation(m_nzRot - 8 * dx);
             }
             else if(m_nyRot > 90*16 && m_nyRot < 270*16)
             {
@@ -647,17 +758,17 @@ void GLViewer::mouseMoveEvent(QMouseEvent *event)
         }
     }
     // Right button held down zooms in/out on object
-    else if (event->buttons() & Qt::RightButton) 
+    else if (m_bMouse && m_bRotate && event->buttons() & Qt::RightButton) 
     {
         setZTranslation(m_lfzTrans - m_lfDz * dy);
     } 
     // Shift and left button held down translates object in xy-coordinate space
-    else if (m_bshift && event->buttons() & Qt::LeftButton) 
+    else if (m_bMouse && m_bshift && event->buttons() & Qt::LeftButton) 
     {
         setXTranslation(m_lfxTrans + m_lfDx * dx);
         setYTranslation(m_lfyTrans - m_lfDy * dy);
     }
-    
+
     m_QPlastPos = event->pos();    // Saves mouse position after movement ends
 }
 
@@ -676,28 +787,28 @@ void GLViewer::keyPressEvent(QKeyEvent *event)
     {
         if(m_bCKey)
         {
-           m_bCKey = false;
-           hideCloud("meshCloud1");
-           showPolygonMesh("mesh1");
-           update();
+            m_bCKey = false;
+            hideCloud("meshCloud1");
+            showPolygonMesh("mesh1");
+            update();
         }
         else
         {
-           m_bCKey = true;
-           hidePolygonMesh("mesh1");
-           showCloud("meshCloud1");
-           update();
+            m_bCKey = true;
+            hidePolygonMesh("mesh1");
+            showCloud("meshCloud1");
+            update();
         }
     }
     if (sKey == "h" || sKey == "H")
     {
         if(m_bHKey)
         {
-           m_bHKey = false;
+            m_bHKey = false;
         }
         else
         {
-           m_bHKey = true;
+            m_bHKey = true;
         }
     }
     // Checks for when the Shift key is held down
@@ -718,35 +829,35 @@ void GLViewer::keyReleaseEvent(QKeyEvent *event)
 
 vector<double> GLViewer::normalizeUP()
 {
-   vector<double> normalizedUp;
-   // UP/||UP||
-   normalizedUp.push_back(m_lfxUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
-                                       m_lfzUp * m_lfzUp));
-   normalizedUp.push_back(m_lfyUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
-                                       m_lfzUp * m_lfzUp));
-   normalizedUp.push_back(m_lfzUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
-                                       m_lfzUp * m_lfzUp));
-   return normalizedUp;
+    vector<double> normalizedUp;
+    // UP/||UP||
+    normalizedUp.push_back(m_lfxUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
+                           m_lfzUp * m_lfzUp));
+    normalizedUp.push_back(m_lfyUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
+                           m_lfzUp * m_lfzUp));
+    normalizedUp.push_back(m_lfzUp/sqrt(m_lfxUp * m_lfxUp + m_lfyUp * m_lfyUp + 
+                           m_lfzUp * m_lfzUp));
+    return normalizedUp;
 }
 
 vector<double> GLViewer::normalizeLOS()
 {
-   // F/||F||
-   vector<double> normalizedLOS;
-   normalizedLOS.push_back(m_lfxLOS/sqrt(m_lfxLOS * m_lfxLOS + 
-                                         m_lfyLOS * m_lfyLOS +
-                                         m_lfzLOS * m_lfzLOS));
-   normalizedLOS.push_back(m_lfyLOS/sqrt(m_lfxLOS * m_lfxLOS + 
-                                         m_lfyLOS * m_lfyLOS +
-                                         m_lfzLOS * m_lfzLOS));
-   normalizedLOS.push_back(m_lfzLOS/sqrt(m_lfxLOS * m_lfxLOS + 
-                                         m_lfyLOS * m_lfyLOS +
-                                         m_lfzLOS * m_lfzLOS));
-   return normalizedLOS;
+    // F/||F||
+    vector<double> normalizedLOS;
+    normalizedLOS.push_back(m_lfxLOS/sqrt(m_lfxLOS * m_lfxLOS + 
+                            m_lfyLOS * m_lfyLOS +
+                            m_lfzLOS * m_lfzLOS));
+    normalizedLOS.push_back(m_lfyLOS/sqrt(m_lfxLOS * m_lfxLOS + 
+                            m_lfyLOS * m_lfyLOS +
+                            m_lfzLOS * m_lfzLOS));
+    normalizedLOS.push_back(m_lfzLOS/sqrt(m_lfxLOS * m_lfxLOS + 
+                            m_lfyLOS * m_lfyLOS +
+                            m_lfzLOS * m_lfzLOS));
+    return normalizedLOS;
 }
 
 vector<double> GLViewer::normalizeCross(std::vector<double> fVec, 
-                                        std::vector<double> upVec)
+    std::vector<double> upVec)
 {
     vector<double>normalizedCross;
     // i = j x k - k x j
@@ -839,7 +950,7 @@ void GLViewer::paintGL()
 
     // Sets camera fov, aspect ratio, and near/far values
     gluPerspective(45.0, 1.0, 0.01f, 350.0);
-    
+
     vector<double> u1Vec = normalizeUP();
     vector<double> f1Vec = normalizeLOS();
     vector<double> s1Vec = normalizeCross(f1Vec, u1Vec);
@@ -854,13 +965,13 @@ void GLViewer::paintGL()
     double zDir = -m_lfzTrans - m_lfZAvg;             //   and rotates around it
 
     glTranslated(-xDir, -yDir, -zDir);
-    
+
     glRotatef(m_nxRot / 16.0, 1.0, 0.0, 0.0);          // Rotates camera
     glRotatef(m_nyRot / 16.0, 0.0, 1.0, 0.0);          //   around origin
     glRotatef(m_nzRot / 16.0, 0.0, 0.0, 1.0);
 
     glTranslated(-m_lfXAvg, -m_lfYAvg, -m_lfZAvg);     // Move the camera
-                                                       //   relative to object
+    //   relative to object
     // Origin axis
     if(m_bDrawAxis)
     {
@@ -990,18 +1101,18 @@ void GLViewer::paintGL()
     }
 
     // MIP for testing purposes
-//     vector<double> cameraPos = getCameraLocation();
-//     cout << "Camera Position: ";
-//     cout << cameraPos[0] << ", " << cameraPos[1] << ", " << cameraPos[2] 
-//          << endl;
-//     vector<double> cameraLOS = getCameraLineOfSight();
-//     cout << "Camera Line of Sight: ";
-//     cout << cameraLOS[0] << ", " << cameraLOS[1] << ", " << cameraLOS[2] 
-//          << endl;
-//     vector<double> cameraUp = getCameraUp();
-//     cout << "Camera Up Vector: ";
-//     cout << cameraUp[0] << ", " << cameraUp[1] << ", " << cameraUp[2] 
-//          << endl;
+    //     vector<double> cameraPos = getCameraLocation();
+    //     cout << "Camera Position: ";
+    //     cout << cameraPos[0] << ", " << cameraPos[1] << ", " << cameraPos[2] 
+    //          << endl;
+    //     vector<double> cameraLOS = getCameraLineOfSight();
+    //     cout << "Camera Line of Sight: ";
+    //     cout << cameraLOS[0] << ", " << cameraLOS[1] << ", " << cameraLOS[2] 
+    //          << endl;
+    //     vector<double> cameraUp = getCameraUp();
+    //     cout << "Camera Up Vector: ";
+    //     cout << cameraUp[0] << ", " << cameraUp[1] << ", " << cameraUp[2] 
+    //          << endl;
 
 }
 
@@ -1021,7 +1132,7 @@ vector<double> GLViewer::getCameraLocation()
     glGetDoublev( GL_MODELVIEW_MATRIX, matModelView ); 
     glGetDoublev( GL_PROJECTION_MATRIX, matProjection ); 
     glGetIntegerv( GL_VIEWPORT, viewport );  // Gets viewport dimensions
-    
+
     // Unprojects the camera plane to determine its location in 3D space
     gluUnProject( (viewport[2]-viewport[0])/2 , (viewport[3]-viewport[1])/2, 
                   0.0, matModelView, matProjection, viewport,  
@@ -1045,7 +1156,7 @@ void GLViewer::setCameraLocation(vector<double> vecLoc)
     {
         cout << "\033[1;31mException: Camera location dimension is too small." 
              << endl << 
-                "           It should have 3 elements, not " << vecLoc.size() 
+             "           It should have 3 elements, not " << vecLoc.size() 
              << "\033[0m" << endl;
     }
     // If the camera location is defined in greater than 3D space...
@@ -1053,7 +1164,7 @@ void GLViewer::setCameraLocation(vector<double> vecLoc)
     {
         cout << "\033[1;31mException: Camera location dimension is too large." 
              << endl << 
-                "           It should have 3 elements, not " << vecLoc.size() 
+             "           It should have 3 elements, not " << vecLoc.size() 
              << "\033[0m" << endl;
     }
 }
@@ -1120,7 +1231,7 @@ void GLViewer::setCameraLineOfSight(std::vector<double> vecLOS)
     {
         cout << "\033[1;31mException: Camera line of sight dimension is "
              << "too small." << endl << 
-                "           It should have 3 elements, not " << vecLOS.size() 
+             "           It should have 3 elements, not " << vecLOS.size() 
              << "\033[0m" << endl;
     }
     // If the camera line of sight is defined in greater than 3D space...
@@ -1128,7 +1239,7 @@ void GLViewer::setCameraLineOfSight(std::vector<double> vecLOS)
     {
         cout << "\033[1;31mException: Camera line of sight dimension is "
              << "too large." << endl << 
-                "           It should have 3 elements, not " << vecLOS.size() 
+             "           It should have 3 elements, not " << vecLOS.size() 
              << "\033[0m" << endl;
     }
 }
@@ -1162,7 +1273,7 @@ vector<double> GLViewer::getCameraUp()
     float xUp1 = xUp;
     float yUp1 = yUp;
     float zUp1 = zUp;
-    
+
     // rotate about the y-axis
     xUp = xUp1 * my[0] + yUp1 * my[1] + zUp1 * my[2];
     yUp = xUp1 * my[4] + yUp1 * my[5] + zUp1 * my[6];
@@ -1171,7 +1282,7 @@ vector<double> GLViewer::getCameraUp()
     xUp1 = xUp;
     yUp1 = yUp;
     zUp1 = zUp;
-    
+
     // rotate about the z-axis
     xUp = xUp1 * mz[0] + yUp1 * mz[1] + zUp1 * mz[2];
     yUp = xUp1 * mz[4] + yUp1 * mz[5] + zUp1 * mz[6];
@@ -1200,7 +1311,7 @@ void GLViewer::setCameraUp(std::vector<double> vecUp)
     {
         cout << "\033[1;31mException: Camera up vector dimension is "
              << "too small." << endl << 
-                "           It should have 3 elements, not " << vecUp.size() 
+             "           It should have 3 elements, not " << vecUp.size() 
              << "\033[0m" << endl;
     }
     // If the camera up vector is defined in greater than 3D space...
@@ -1208,7 +1319,7 @@ void GLViewer::setCameraUp(std::vector<double> vecUp)
     {
         cout << "\033[1;31mException: Camera up vector dimension is "
              << "too large." << endl << 
-                "           It should have 3 elements, not " << vecUp.size() 
+             "           It should have 3 elements, not " << vecUp.size() 
              << "\033[0m" << endl;
     }
 }
@@ -1294,30 +1405,30 @@ void GLViewer::findIndex(int idx)
                          +  (m_vlfPoint[2] - p1.z) * (m_vlfPoint[2] - p1.z));
         if(jDist < dDist) // Find the closest cloud point to selected point
         {
-           dDist = jDist;
-           m_nIndex = v1;
-           m_nPolygonIndex = j;
-           m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
+            dDist = jDist;
+            m_nIndex = v1;
+            m_nPolygonIndex = j;
+            m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
         }
         jDist = sqrt((m_vlfPoint[0] - p2.x) * (m_vlfPoint[0] - p2.x)
                   +  (m_vlfPoint[1] - p2.y) * (m_vlfPoint[1] - p2.y)
                   +  (m_vlfPoint[2] - p2.z) * (m_vlfPoint[2] - p2.z));
         if(jDist < dDist)
         {
-           dDist = jDist;
-           m_nIndex = v2;
-           m_nPolygonIndex = j;
-           m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
+            dDist = jDist;
+            m_nIndex = v2;
+            m_nPolygonIndex = j;
+            m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
         }
         jDist = sqrt((m_vlfPoint[0] - p3.x) * (m_vlfPoint[0] - p3.x)
                   +  (m_vlfPoint[1] - p3.y) * (m_vlfPoint[1] - p3.y)
                   +  (m_vlfPoint[2] - p3.z) * (m_vlfPoint[2] - p3.z));
         if(jDist < dDist)
         {
-           dDist = jDist;
-           m_nIndex = v3;
-           m_nPolygonIndex = j;
-           m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
+            dDist = jDist;
+            m_nIndex = v3;
+            m_nPolygonIndex = j;
+            m_sIndex = m_vQSMeshNames[i].toUtf8().constData();
         }
     }
     // MIP for testing
@@ -1366,7 +1477,7 @@ void GLViewer::getPointIndex()
         {
             vector<double> oneRad;  // Find a good representation of the 
             oneRad.push_back(1e12); //   spacing between cloud points
-			for(int j=1; j < m_vClouds[i]->points.size(); ++j)
+            for(int j=1; j < m_vClouds[i]->points.size(); ++j)
             {
                 PointT p1;
                 p1 = m_vClouds[i]->points[j];
@@ -1384,7 +1495,7 @@ void GLViewer::getPointIndex()
                 }
             }                      
             oneRad[i] = oneRad[i] * 10.0; // Need cloud data to be visible
-                                          //   so add scaling factor
+            //   so add scaling factor
             double dDist = 1e12;
             for(int j=1; j < m_vClouds[i]->points.size(); ++j)
             {
@@ -1397,9 +1508,9 @@ void GLViewer::getPointIndex()
 
                 // how close is this cloud point to the point picked
                 double jDist = 
-                        sqrt((m_vlfPoint[0] - p1.x) * (m_vlfPoint[0] - p1.x)
-                          +  (m_vlfPoint[1] - p1.y) * (m_vlfPoint[1] - p1.y)
-                          +  (m_vlfPoint[2] - p1.z) * (m_vlfPoint[2] - p1.z));
+                    sqrt((m_vlfPoint[0] - p1.x) * (m_vlfPoint[0] - p1.x)
+                      +  (m_vlfPoint[1] - p1.y) * (m_vlfPoint[1] - p1.y)
+                      +  (m_vlfPoint[2] - p1.z) * (m_vlfPoint[2] - p1.z));
                 if(jDist < dDist)  // find closest cloud point to point picked
                 {
                     dDist = jDist;

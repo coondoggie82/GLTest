@@ -2,6 +2,9 @@
 #define GLVIEWER_H
 
 #include <QGLWidget>
+#include <QTouchEvent>
+#include <QGraphicsItem>
+#include <qgesture.h>
 #include <vector>
 #include <pcl/point_cloud.h>
 #include <pcl/visualization/pcl_visualizer.h>
@@ -22,7 +25,7 @@ public:
     void showPolygonMesh(QString meshName);
     void hidePolygonMesh(QString meshName);
     void showCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
-		           QString cloudName);
+                   QString cloudName);
     void showCloud(QString cloudName);
     void hideCloud(QString cloudName);
     QSize sizeHint() const;
@@ -50,6 +53,13 @@ protected:
     void drawGLTriangles(std::vector<pcl::PolygonMesh>::iterator it);
     void paintGL();
     void resizeGL(int width, int height);
+    bool event(QEvent *event);
+    void swipeTriggered(QSwipeGesture *gesture);
+    void panTriggered(QPanGesture *gesture);
+    void pinchTriggered(QPinchGesture *gesture);
+    bool gestureEvent(QGestureEvent *event);
+    void mouseDoubleClickEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
     void mousePressEvent(QMouseEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void keyPressEvent(QKeyEvent *event);
@@ -102,7 +112,10 @@ private:
     bool m_bDrawAxis;
 
     bool m_bshift;
+    bool m_bMouse;
+    bool m_bRotate;
     QPoint m_QPlastPos;
+    qreal m_qrTotalScaleFactor;
 
     std::vector<double> m_vlfPoint;
     int m_nIndex;
@@ -115,28 +128,28 @@ private:
     std::vector<bool> m_vbShowMeshes;
     std::vector<pcl::PolygonMesh> m_vMeshes;
     std::vector< PointCloudT::Ptr, 
-		 Eigen::aligned_allocator <PointCloudT::Ptr > > m_vClouds;
+                 Eigen::aligned_allocator <PointCloudT::Ptr > > m_vClouds;
 
     // MIP These are for testing purposes
     bool m_bCKey;
     bool m_bHKey;
     void splitPolygonMesh(pcl::PolygonMesh mesh);
 
-public slots:
-    void setXRotation(int angle);
-    void setYRotation(int angle);
-    void setZRotation(int angle);
-    void setXTranslation(double dist);
-    void setYTranslation(double dist);
-    void setZTranslation(double dist);
+    public slots:
+        void setXRotation(int angle);
+        void setYRotation(int angle);
+        void setZRotation(int angle);
+        void setXTranslation(double dist);
+        void setYTranslation(double dist);
+        void setZTranslation(double dist);
 
 signals:
-    void xRotationChanged(int angle);
-    void yRotationChanged(int angle);
-    void zRotationChanged(int angle);
-    void xTranslationChanged(double dist);
-    void yTranslationChanged(double dist);
-    void zTranslationChanged(double dist);
+        void xRotationChanged(int angle);
+        void yRotationChanged(int angle);
+        void zRotationChanged(int angle);
+        void xTranslationChanged(double dist);
+        void yTranslationChanged(double dist);
+        void zTranslationChanged(double dist);
 };
 
 #endif // PCLVIEWER_H
